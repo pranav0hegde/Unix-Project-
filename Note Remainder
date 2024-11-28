@@ -1,0 +1,120 @@
+ 
+#!/bin/bash 
+ 
+# Function to schedule a task 
+schedule_task() { 
+    task_description=$(zenity --entry --title="Schedule Task" --text="Enter task 
+description:") 
+    task_time=$(zenity --entry --title="Schedule Task" --text="Enter task time 
+(HH:MM):") 
+    
+    # Validate time format 
+    if [[ ! $task_time =~ ^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$ ]]; then 
+        zenity --error --title="Invalid Time" --text="Please enter time in HH:MM format." 
+        return 
+    fi 
+ 
+    echo "notify-send 'Task $task_description completed'" | at "$task_time" >/dev/null 
+2>&1 
+    echo "$task_description - $task_time" >> tasks.txt 
+    update_task_list 
+} 
+ 
+# Function to reschedule a task 
+reschedule_task() { 
+    selected_task=$(zenity --list --title="Reschedule Task" --text="Select task to 
+reschedule:" --column="Task" --column="Time" $(cat tasks.txt)) 
+    if [ -n "$selected_task" ]; then 
+        old_task=$(echo "$selected_task" | awk '{print $1}') 
+        old_time=$(echo "$selected_task" | awk '{print $2}') 
+        new_time=$(zenity --entry --title="Reschedule Task" --text="Enter new time for 
+task $old_task (HH:MM):") 
+        
+        
+ 
+ 
+ 
+ 
+ # Validate time format 
+        if [[ ! $new_time =~ ^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$ ]]; then 
+            zenity --error --title="Invalid Time" --text="Please enter time in HH:MM 
+format." 
+             
+return 
+        fi 
+ 
+        at -r "$old_time" >/dev/null 2>&1 
+        echo "notify-send 'Task $old_task rescheduled to $new_time'" | at "$new_time" 
+>/dev/null 2>&1 
+        sed -i "s/$old_task - $old_time/$old_task - $new_time/" tasks.txt 
+        update_task_list 
+    fi 
+} 
+ 
+# Function to delete a task 
+delete_task() { 
+    selected_task=$(zenity --list --title="Delete Task" --text="Select task to delete:" -
+column="Task" --column="Time" $(cat tasks.txt)) 
+    if [ -n "$selected_task" ]; then 
+        task=$(echo "$selected_task" | awk '{print $1}') 
+        time=$(echo "$selected_task" | awk '{print $2}') 
+        at -r "$time" >/dev/null 2>&1 
+        sed -i "/$task - $time/d" tasks.txt 
+        update_task_list 
+    fi 
+} 
+ 
+# Function to display all tasks 
+display_tasks() { 
+    tasks="" 
+    current_time=$(date +"%H:%M") 
+    echo "Current Time: $current_time" 
+    while IFS= read -r line; do 
+        task=$(echo "$line" | cut -d'-' -f1) 
+        time=$(echo "$line" | cut -d'-' -f2) 
+        echo "Task: $task" 
+        echo "Time: $time" 
+        
+ 
+ 
+ 
+ 
+ if [[ "$time" < "$current_time" ]]; then 
+            tasks+="Completed: $task - $time\n" 
+        else 
+            tasks+="Upcoming: $task - $time\n" 
+        fi 
+    done < tasks.txt 
+ 
+    zenity --text-info --title="Task List" --width=400 --height=300 --text="$tasks" 
+ 
+} 
+ 
+# Function to update the task list 
+update_task_list() { 
+    tasks=$(cat tasks.txt) 
+    zenity --info --title="Task Updated" --text="Task list updated." 
+} 
+ 
+# Main menu 
+while true; do 
+    choice=$(zenity --list --title="Task Scheduler" --column="Action" "Schedule Task" 
+"Reschedule Task" "Delete Task" "Display Tasks" "Exit") 
+    case $choice in 
+        "Schedule Task") 
+            schedule_task 
+            ;; 
+        "Reschedule Task") 
+            reschedule_task 
+            ;; 
+        "Delete Task") 
+            delete_task 
+            ;; 
+        "Display Tasks") 
+            display_tasks 
+            ;; 
+        "Exit") 
+            exit 0 
+            ;; 
+    esac 
+done 
